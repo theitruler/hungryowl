@@ -5,6 +5,8 @@ import { isDemo } from "./runtime";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { requestLimits } from "@/db/schema";
+import { randomUUID } from "node:crypto";
+import { errorDiagnostics } from "./error-diagnostics";
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -73,9 +75,15 @@ export function api(handler: (request: Request) => Promise<Response>) {
           },
           { status: 400 },
         );
-      console.error("Request failed", { type: e instanceof Error ? e.name : "UnknownError" });
+      const requestId = randomUUID();
+      console.error("Request failed", {
+        requestId,
+        method: request.method,
+        pathname: new URL(request.url).pathname,
+        errors: errorDiagnostics(e),
+      });
       return Response.json(
-        { error: "Something went wrong. Please try again shortly." },
+        { error: `Something went wrong. Please try again shortly. Reference: ${requestId}`, requestId },
         { status: 500 },
       );
     }

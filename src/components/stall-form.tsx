@@ -55,7 +55,7 @@ function PhotoInput({
         <>
           <Camera size={25} />
           <strong>{index === 0 ? "The stall & signboard" : "Another view of the stall"}</strong>
-          <span>JPG, PNG or WebP · Up to 5 MB</span>
+          <span>JPG, PNG or WebP · Up to 4 MB</span>
         </>
       )}
       <input
@@ -101,7 +101,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
       file.size > MAX_PHOTO_BYTES ||
       !["image/jpeg", "image/png", "image/webp"].includes(file.type)
     ) {
-      setError("Use a JPG, PNG or WebP under 5 MB.");
+      setError("Use a JPG, PNG or WebP under 4 MB.");
       return;
     }
     setFiles((previous) => previous.map((item, i) => (i === index ? file : item)));

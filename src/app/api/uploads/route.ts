@@ -1,5 +1,3 @@
-import { mkdir, writeFile, unlink } from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { getDb } from "@/db";
@@ -33,7 +31,7 @@ export const POST = api(async (request) => {
     file.size === 0 ||
     !["image/jpeg", "image/png", "image/webp"].includes(file.type)
   )
-    throw new ApiError(400, "Use a JPG, PNG or WebP image under 5 MB.");
+    throw new ApiError(400, "Use a JPG, PNG or WebP image under 4 MB.");
   let output: Buffer;
   try {
     const source = sharp(Buffer.from(await file.arrayBuffer()), {
@@ -60,16 +58,7 @@ export const POST = api(async (request) => {
       "This image could not be read. Use a clear, non-animated photo at least 200 × 200 pixels.",
     );
   }
-  const id = randomUUID(),
-    dir = path.resolve(process.env.UPLOAD_DIR || "./data/uploads"),
-    filename = path.join(dir, `${id}.webp`);
-  await mkdir(dir, { recursive: true });
-  await writeFile(filename, output, { flag: "wx" });
-  try {
-    await getDb().insert(photos).values({ id, uploadedBy: viewer.id });
-  } catch (error) {
-    await unlink(filename).catch(() => {});
-    throw error;
-  }
+  const id = randomUUID();
+  await getDb().insert(photos).values({ id, uploadedBy: viewer.id, data: output });
   return Response.json({ id, url: `/api/photos/${id}` }, { status: 201 });
 });

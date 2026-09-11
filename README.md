@@ -42,8 +42,11 @@ See `.env.example`. Keep credentials in private `.env` or `.env.local` files. Ne
 | `BETTER_AUTH_URL`                          | Exact app origin; HTTPS in production, matching the browser URL                  |
 | `BETTER_AUTH_SECRET`                       | Random secret of at least 32 characters; generate with `openssl rand -base64 48` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth web application credentials                                         |
-| `UPLOAD_DIR`                               | Persistent photo directory, default `./data/uploads`                             |
 | `DEMO_MODE`                                | Explicit sample fixture mode; set `false` for live operation                     |
+
+## GitHub and Vercel deployment
+
+Push this repository to GitHub, then import the GitHub repository into Vercel. The included Vercel build configuration automatically runs the photo-table migration for production deployments before building the app. In Vercel, add the same production values for every variable in `.env.example`; `DATABASE_URL_UNPOOLED` is required during the production build and `DATABASE_URL` is used by the live app. Do not add `UPLOAD_DIR` or any Vercel Blob variables.
 
 ### Google setup
 

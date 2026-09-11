@@ -13,8 +13,14 @@ import {
   uniqueIndex,
   check,
   bigint,
+  customType,
 } from "drizzle-orm/pg-core";
 import type { Diet } from "../lib/config";
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 export const user = pgTable(
   "app_user",
   {
@@ -151,6 +157,7 @@ export const photos = pgTable(
     uploadedBy: text("uploaded_by")
       .notNull()
       .references(() => user.id),
+    data: bytea("data"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_uploader_idx").on(t.uploadedBy)],

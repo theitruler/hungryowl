@@ -1,25 +1,17 @@
 import { config } from "dotenv";
 import { Pool } from "pg";
-import { unlink } from "node:fs/promises";
-import path from "node:path";
 config({ path: ".env.local", quiet: true });
 async function main() {
   const connectionString = process.env.DATABASE_URL_UNPOOLED;
   if (!connectionString) throw new Error("Set DATABASE_URL_UNPOOLED.");
   const pool = new Pool({ connectionString, max: 1 }),
     client = await pool.connect();
-  const directory = path.resolve(process.env.UPLOAD_DIR || "./data/uploads");
   try {
     await client.query("begin");
     const { rows } = await client.query<{ id: string }>(
       "select p.id from photos p where created_at < now() - interval '24 hours' and not exists (select 1 from stall_photos s where s.photo_id = p.id) limit 1000 for update of p skip locked",
     );
     for (const row of rows) {
-      const filename = path.resolve(directory, `${row.id}.webp`);
-      if (path.dirname(filename) !== directory) throw new Error("Invalid storage path.");
-      await unlink(filename).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== "ENOENT") throw error;
-      });
       await client.query("delete from photos where id = $1", [row.id]);
     }
     await client.query("delete from app_session where expires_at < now()");

@@ -3,7 +3,9 @@ export const TIME_ZONE = "Asia/Kolkata";
 export const DEFAULT_RADIUS_KM = 5;
 export const MAX_RADIUS_KM = 30;
 export const NEW_STALL_DAYS = 14;
-export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+// Vercel Functions accept request bodies up to 4.5 MB. Leave space for the
+// multipart envelope so valid browser uploads do not fail at the platform.
+export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
 export const DIETS = ["veg", "non-veg", "egg"] as const;
 export const DIET_LABELS = { veg: "Veg", "non-veg": "Non-veg", egg: "Egg" };
 export type Diet = (typeof DIETS)[number];
