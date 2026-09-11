@@ -1,0 +1,78 @@
+import type { Stall } from "./config";
+export const DEMO_LOCATION = { latitude: 12.9352, longitude: 77.6245 };
+// Illustrative fixtures only. Never inserted into the live stall database.
+export const DEMO_STALLS: Stall[] = [
+  {
+    id: "sample-dosa",
+    name: "The Midnight Dosa",
+    description:
+      "A crisp dosa, a hot cup of chai, and a good reason to take the long way home. This is an illustrative listing for the HungryOwl preview.",
+    area: "Koramangala, 5th Block",
+    latitude: 12.9368,
+    longitude: 77.6261,
+    diets: ["veg"],
+    opensAt: "21:00",
+    closesAt: "05:00",
+    ownerId: "sample-owner",
+    rating: 4.8,
+    ratingCount: 124,
+    menu: [
+      { name: "Benne masala dosa", price: 80, diet: "veg" },
+      { name: "Plain dosa", price: 50, diet: "veg" },
+      { name: "Filter coffee", price: 30, diet: "veg" },
+    ],
+    photos: ["/images/night-food.webp", "/images/night-food.webp"],
+    createdAt: "2026-08-01T00:00:00Z",
+    approvedAt: "2026-08-02T00:00:00Z",
+    closedUntil: null,
+    status: "approved",
+  },
+  {
+    id: "sample-chai",
+    name: "Chai After Dark",
+    description:
+      "Your little pause between the ride and the road home. An illustrative listing with fresh chai and midnight bites.",
+    area: "HSR Layout, Sector 2",
+    latitude: 12.9248,
+    longitude: 77.6305,
+    diets: ["veg", "egg"],
+    opensAt: "22:00",
+    closesAt: "06:00",
+    ownerId: null,
+    rating: 4.6,
+    ratingCount: 86,
+    menu: [
+      { name: "Ginger chai", price: 20, diet: "veg" },
+      { name: "Egg toast", price: 60, diet: "egg" },
+    ],
+    photos: ["/images/night-food.webp", "/images/night-food.webp"],
+    createdAt: "2026-08-01T00:00:00Z",
+    approvedAt: "2026-08-02T00:00:00Z",
+    closedUntil: null,
+    status: "approved",
+  },
+  {
+    id: "sample-bites",
+    name: "Owl’s Nest Kitchen",
+    description:
+      "A small counter for big midnight appetites. This sample stall shows how a newly approved listing appears.",
+    area: "BTM Layout, 1st Stage",
+    latitude: 12.9224,
+    longitude: 77.6115,
+    diets: ["non-veg", "egg"],
+    opensAt: "23:00",
+    closesAt: "04:00",
+    ownerId: "sample-owner-2",
+    rating: null,
+    ratingCount: 0,
+    menu: [
+      { name: "Chicken roll", price: 120, diet: "non-veg" },
+      { name: "Egg roll", price: null, diet: "egg" },
+    ],
+    photos: ["/images/night-food.webp", "/images/night-food.webp"],
+    createdAt: "2026-09-10T00:00:00Z",
+    approvedAt: "2026-09-10T00:00:00Z",
+    closedUntil: null,
+    status: "approved",
+  },
+];
