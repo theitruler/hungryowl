@@ -66,6 +66,7 @@ export function AdminQueue({ listings, reports }: { listings: Listing[]; reports
         <p>
           Showing up to 100 newest actionable listings. Review both photos and details before
           approving.
+          {" "}Approving an own-stall submission also confirms the submitter as its owner.
         </p>
         {!listings.length && <p>No stalls waiting for review or an owner claim.</p>}
         {listings.map((stall) => (

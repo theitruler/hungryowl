@@ -12,7 +12,7 @@ export default async function OwnerPage() {
     return (
       <AccessGate
         title="Your little corner of HungryOwl"
-        message="Sign in to manage your verified stalls and follow your submissions."
+        message="Sign in to manage your stalls and follow your submissions."
       />
     );
   const list = viewer ? await myStalls(viewer) : [];
@@ -23,7 +23,7 @@ export default async function OwnerPage() {
           <Store size={15} /> BEHIND THE COUNTER
         </div>
         <h1>My stalls & submissions</h1>
-        <p>Follow your submissions and keep your verified stalls up to date.</p>
+        <p>Manage your own stalls and follow your submissions until an owner is assigned.</p>
       </div>
       {demo && (
         <div className="notice">
@@ -38,7 +38,7 @@ export default async function OwnerPage() {
               <h3>{stall.name}</h3>
               <p>
                 {stall.area} ·{" "}
-                {stall.ownerId === viewer?.id ? "Your verified stall" : "Your submission"}
+                {stall.canManage ? "Your stall · You can edit" : "Your submission · View only"}
               </p>
               {stall.rejectionReason && (
                 <p className="notice error">Review note: {stall.rejectionReason}</p>
@@ -49,7 +49,7 @@ export default async function OwnerPage() {
               <Link className="button secondary small" href={`/stalls/${stall.id}`}>
                 View
               </Link>
-              {stall.ownerId === viewer?.id && (
+              {stall.canManage && (
                 <Link className="button primary small" href={`/owner/${stall.id}`}>
                   Manage <ArrowRight size={14} />
                 </Link>
@@ -62,8 +62,8 @@ export default async function OwnerPage() {
           <Store size={36} />
           <h2>Your food story starts here.</h2>
           <p>
-            Add a stall to see its review status here. After our admin calls and verifies the owner,
-            that owner can manage the listing directly.
+            Add your own stall to manage it here. Stalls you submit for someone else appear here
+            until an admin assigns their owner.
           </p>
           <Link href="/add" className="button primary">
             <Plus size={16} /> Add a stall

@@ -43,6 +43,26 @@ export function servesLateNight(open: string, close: string) {
     b = timeMinutes(close);
   return a === b || a > b || a < 360 || b > 1380;
 }
+export function nextOpening(stall: { opensAt: string; closesAt: string; closedUntil: string | null }, now = new Date()) {
+  if (isOpen(stall, now)) return null;
+  const availableAt = stall.closedUntil && new Date(stall.closedUntil) > now
+    ? new Date(stall.closedUntil) : now;
+  if (isOpen({ ...stall, closedUntil: null }, availableAt)) return availableAt;
+  const minutesUntilOpen = (timeMinutes(stall.opensAt) - localMinutes(availableAt) + 1440) % 1440;
+  return new Date(Math.floor(availableAt.getTime() / 60000) * 60000 + minutesUntilOpen * 60000);
+}
+
+export function openingLabel(stall: { opensAt: string; closesAt: string; closedUntil: string | null }, now = new Date()) {
+  const next = nextOpening(stall, now);
+  if (!next) return "Open now";
+  const minutes = Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 60000));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const remaining = minutes % 60;
+  const duration = [days && `${days}d`, hours && `${hours}h`, remaining && `${remaining}m`].filter(Boolean).join(" ");
+  const time = new Intl.DateTimeFormat("en-IN", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(next);
+  return `Opens in ${duration} · ${time}`;
+}
 export function inBangalore({ latitude, longitude }: Coordinates) {
   return latitude >= 12.7 && latitude <= 13.3 && longitude >= 77.3 && longitude <= 77.9;
 }

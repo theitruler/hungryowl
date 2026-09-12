@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight, Clock3, MapPin, BadgeCheck, Star } from "lucide-react";
 import { DIET_LABELS, type Diet, type Stall } from "@/lib/config";
-import { formatTime, formatDistance, isNew } from "@/lib/geo-time";
+import { formatTime, formatDistance, isNew, isOpen, openingLabel } from "@/lib/geo-time";
 export function DietLabels({ diets }: { diets: Diet[] }) {
   return (
     <span className="diet-labels">
@@ -17,7 +17,8 @@ export function DietLabels({ diets }: { diets: Diet[] }) {
     </span>
   );
 }
-export function StallCard({ stall, index = 0 }: { stall: Stall; index?: number }) {
+export function StallCard({ stall, index = 0, now = new Date() }: { stall: Stall; index?: number; now?: Date }) {
+  const open = isOpen(stall, now);
   return (
     <Link href={`/stalls/${stall.id}`} className="stall-card">
       <div className={`card-photo crop-${index % 3}`}>
@@ -27,8 +28,8 @@ export function StallCard({ stall, index = 0 }: { stall: Stall; index?: number }
           fill
           sizes="(max-width: 650px) 100vw, (max-width: 1100px) 45vw, 30vw"
         />
-        <span className="open-badge">
-          <span /> Open now
+        <span className={`open-badge ${open ? "" : "closed-badge"}`}>
+          <span /> {open ? "Open now" : "Opens later"}
         </span>
         {isNew(stall.approvedAt) && <span className="new-badge">NEW</span>}
         <span className="card-distance">
@@ -44,6 +45,7 @@ export function StallCard({ stall, index = 0 }: { stall: Stall; index?: number }
           </span>
         </div>
         <p className="card-area">{stall.area}</p>
+        {!open && <p className="opening-time">{openingLabel(stall, now)}</p>}
         <DietLabels diets={stall.diets} />
         <div className="card-hours">
           <Clock3 size={15} />

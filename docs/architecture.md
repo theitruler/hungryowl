@@ -21,17 +21,19 @@ Session cookies are HTTP-only, secure on HTTPS, and same-origin. Every custom mu
 
 ## Data and permissions
 
-- Users create pending submissions; submission does **not** grant ownership.
-- Admins approve or reject pending submissions. Only approved stalls appear in discovery.
-- After calling an owner, an admin can assign the approved stall to that owner's existing verified email account. Claims are recorded in an audit log and cannot silently replace an existing owner.
-- Verified owners edit their own listings without another approval. They can refresh stall coordinates using current GPS, update both photos, menu and hours, and set temporary closures.
+Add Stall and photo replacement open a live camera preview with capture and retake controls. There is no gallery or file picker. Camera access requires HTTPS (or localhost), browser permission, and a camera. Streams stop on capture, cancellation, and navigation away. Captured frames are resized to at most 1600 pixels and encoded as JPEG before the existing upload validation and WebP conversion. This controls the browser flow; the upload endpoint cannot prove a file originated from a physical camera.
+
+- Users create pending submissions. Selecting “My stall” grants the submitter editing access immediately while the listing awaits approval. Selecting “Someone else’s stall” gives the submitter read-only access. Server-side checks enforce this distinction. Once an admin assigns an owner, only that owner and admins can edit.
+- Admins approve or reject pending submissions. Approving a “My stall” submission also assigns its submitter as owner in the same transaction, without a separate owner assignment. Only approved stalls appear in discovery.
+- For “Someone else’s stall” submissions, after calling an owner, an admin can assign the approved stall to that owner's existing verified email account. Claims are recorded in an audit log and cannot silently replace an existing owner. My stalls includes owned listings and unassigned submissions; once assigned to someone else, a listing disappears from the submitter’s My stalls section.
+- Self-declared and verified owners can refresh stall coordinates using current GPS, update both photos, contact number, menu and hours, and set temporary closures including a custom reopening time. Edits preserve the listing’s review status.
 - Ratings have a `(stall_id, user_id)` primary key; repeated ratings update rather than accumulate. Owners cannot rate their own stalls.
 - Closure reports are limited to one per user/stall/Bangalore calendar day. Admin review is required before a report changes opening status.
-- Public DTOs omit owner phone numbers, submitter IDs, emails and moderation notes.
+- Public discovery DTOs omit phone numbers and moderation notes. Stall detail responses include a private submission section only for the submitter, owner, or admin. Admin and owner views omit visitor rating, directions, and reporting sections. Admin detail and edit pages return to `/admin`; personal submissions return to `/owner`.
 
 ## Discovery rules
 
-Daily opening hours are interpreted in Asia/Kolkata. When opening time is later than closing time, service crosses midnight. The closing boundary is exclusive. Equal opening and closing times mean 24 hours. Each listing must serve some part of the 11 pm–6 am window. The app remains available during the day and shows qualifying stalls if their own hours say they are open.
+Daily opening hours are interpreted in Asia/Kolkata. When opening time is later than closing time, service crosses midnight. The closing boundary is exclusive. Equal opening and closing times mean 24 hours. Each listing must serve some part of the 11 pm–6 am window. Discovery includes approved stalls whether open or closed, with a countdown and next opening time. Temporary closure expiry is combined with the daily schedule when calculating reopening.
 
 Temporary closures override opening hours and expire automatically. Unclaimed stalls use submitted hours with an explicit “Not confirmed by owner” label. “New” means fewer than 14 days since approval.
 

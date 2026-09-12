@@ -4,12 +4,12 @@ A mobile-first late-night food discovery app for Bangalore. Built with Next.js, 
 
 ## Implemented
 
-- Nearby open stalls, current GPS permission, configurable 1–30 km radius, dietary filters, text search and sorting.
+- Nearby stalls with open-now or next-opening labels, current GPS permission, a 1–30 km radius editable after sign-in, dietary filters, text search and sorting.
 - Overnight schedules, temporary closures, straight-line distance, star ratings, new badges and owner-confirmation labels.
 - Google-only sign-in, automatic account creation and sign-out.
 - GPS-only stall submissions with exactly two processed photos, owner contact, menu and optional prices.
 - Admin approval, rejection reasons, phone-verified owner assignment, closure reports and audit records.
-- Owner editing, responsive layouts, accessible form labels/focus, loading/error/empty/success states.
+- Immediate editing for “My stall” submitters, read-only access for “Someone else’s stall” submissions, complete admin review details, and a swipeable photo carousel with arrow and dot controls.
 
 ## Current status
 

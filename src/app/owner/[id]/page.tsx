@@ -7,6 +7,6 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
   const stall = await getStall((await params).id, viewer);
-  if (!stall || (stall.ownerId !== viewer.id && viewer.role !== "admin")) notFound();
-  return <StallForm stall={stall} demo={false} />;
+  if (!stall?.canManage) notFound();
+  return <StallForm stall={stall} demo={false} backHref={viewer.role === "admin" ? "/admin" : "/owner"} />;
 }

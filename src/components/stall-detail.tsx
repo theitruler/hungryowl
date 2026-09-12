@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -13,8 +12,10 @@ import {
   ExternalLink,
   Pencil,
 } from "lucide-react";
-import type { Stall, Viewer } from "@/lib/config";
-import { formatTime, isOpen } from "@/lib/geo-time";
+import type { StallDetails, Viewer } from "@/lib/config";
+import { formatTime, isOpen, openingLabel } from "@/lib/geo-time";
+import { useClock } from "@/hooks/use-clock";
+import { PhotoCarousel } from "./photo-carousel";
 import { DietLabels } from "./stall-card";
 import { mutate, errorMessage } from "@/lib/client-api";
 export function StallDetail({
@@ -22,7 +23,7 @@ export function StallDetail({
   viewer,
   demo,
 }: {
-  stall: Stall;
+  stall: StallDetails;
   viewer: Viewer | null;
   demo: boolean;
 }) {
@@ -32,8 +33,14 @@ export function StallDetail({
     [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const now = useClock(demo);
   const router = useRouter(),
-    open = demo || isOpen(stall);
+    open = isOpen(stall, now);
+  const admin = viewer?.role === "admin";
+  const canManage = !!viewer && (stall.canManage || viewer.id === stall.ownerId || admin);
+  const workspace = admin || canManage || !!stall.submission;
+  const visitor = !workspace && stall.status === "approved";
+  const backHref = admin ? "/admin" : workspace ? "/owner" : "/";
   async function act(type: "rating" | "report") {
     setBusy(true);
     setError("");
@@ -55,23 +62,10 @@ export function StallDetail({
   }
   return (
     <>
-      <Link href="/" className="back-link">
-        <ArrowLeft size={16} /> Back to nearby stalls
+      <Link href={backHref} className="back-link">
+        <ArrowLeft size={16} /> {admin ? "Back to admin review" : workspace ? "Back to my stalls & submissions" : "Back to nearby stalls"}
       </Link>
-      <div className="detail-gallery">
-        {stall.photos.map((photo, index) => (
-          <div key={`${photo}-${index}`} className="detail-photo">
-            <Image
-              src={photo}
-              alt={`${stall.name}, photo ${index + 1}`}
-              fill
-              sizes={index === 0 ? "(max-width: 760px) 100vw, 50vw" : "30vw"}
-              priority={index === 0}
-              unoptimized={photo.startsWith("/api/")}
-            />
-          </div>
-        ))}
-      </div>
+      <PhotoCarousel photos={stall.photos} name={stall.name} />
       <div className="detail-heading">
         <div>
           <div className="eyebrow">
@@ -79,7 +73,7 @@ export function StallDetail({
               ? `${stall.status.toUpperCase()} SUBMISSION`
               : open
                 ? "OPEN NOW · YOUR NEXT FOOD STOP"
-                : "CURRENTLY CLOSED"}
+                : openingLabel(stall, now)}
           </div>
           <h1>{stall.name}</h1>
           <p>
@@ -96,18 +90,34 @@ export function StallDetail({
             )}
           </div>
         </div>
-        {viewer && (viewer.id === stall.ownerId || viewer.role === "admin") && (
+        {canManage && (
           <Link className="button secondary" href={`/owner/${stall.id}`}>
-            <Pencil size={15} /> Edit stall
+            <Pencil size={15} /> {admin ? "Edit stall" : "Manage my stall"}
           </Link>
         )}
       </div>
       <div className="detail-layout">
         <div>
+          {workspace && (
+            <section className="panel">
+              <h2>{admin ? "Submission details" : canManage ? "Manage your stall" : "Your submission"}</h2>
+              <p>{admin ? "Review the details and both photos provided with this stall." : canManage ? "You can update the menu, photos, opening hours, and temporary closures." : "You submitted someone else’s stall. You can follow its review status here; editing is reserved for the owner and admin team."}</p>
+              {canManage && <Link className="button primary" href={`/owner/${stall.id}`}><Pencil size={16} /> Edit menu, timings & stall details</Link>}
+              <dl className="submission-details">
+                <div><dt>Review status</dt><dd>{stall.status}</dd></div>
+                {stall.submission && <>
+                  <div><dt>Submitted as</dt><dd>{stall.submission.relationship === "mine" ? "My stall" : "Someone else’s stall"}</dd></div>
+                  <div><dt>Owner’s contact number</dt><dd><a href={`tel:${stall.submission.contactPhone}`}>{stall.submission.contactPhone}</a></dd></div>
+                </>}
+                <div><dt>Submitted on</dt><dd>{new Date(stall.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</dd></div>
+              </dl>
+              {stall.submission?.rejectionReason && <p className="notice error">Review note: {stall.submission.rejectionReason}</p>}
+            </section>
+          )}
           <section className="panel">
             <h2>A little about this spot</h2>
             <p style={{ marginTop: 15, marginBottom: 0 }}>
-              {stall.description || "A community-discovered late-night food stall in Bangalore."}
+              {stall.description || (workspace ? "No description provided." : "A community-discovered late-night food stall in Bangalore.")}
             </p>
           </section>
           <section className="panel">
@@ -133,7 +143,7 @@ export function StallDetail({
               </div>
             )}
           </section>
-          <section className="panel">
+          {visitor && <section className="panel">
             <h2>How was your bite?</h2>
             <p>One rating per person. You can update yours any time.</p>
             <div className="stars" role="group" aria-label="Your star rating">
@@ -166,11 +176,12 @@ export function StallDetail({
                 Save rating
               </button>
             )}
-          </section>
+          </section>}
         </div>
         <aside>
           <section className="panel">
-            <h2>Plan your stop</h2>
+            <h2>{workspace ? "Opening hours & location" : "Plan your stop"}</h2>
+            <p className="opening-time">{openingLabel(stall, now)}</p>
             <div className="detail-stat">
               <Clock3 size={20} />
               <div>
@@ -181,7 +192,7 @@ export function StallDetail({
                   Daily · Bangalore time
                   {stall.opensAt > stall.closesAt ? " · Closes next morning" : ""}
                 </small>
-                {stall.closedUntil && new Date(stall.closedUntil) > new Date() && (
+                {stall.closedUntil && new Date(stall.closedUntil) > now && (
                   <small>
                     Temporarily closed until{" "}
                     {new Date(stall.closedUntil).toLocaleString("en-IN", {
@@ -191,7 +202,7 @@ export function StallDetail({
                 )}
               </div>
             </div>
-            <div className="detail-stat">
+            {visitor && <div className="detail-stat">
               <Star size={20} />
               <div>
                 <strong>
@@ -205,7 +216,7 @@ export function StallDetail({
                     : "Be the first to share a rating"}
                 </small>
               </div>
-            </div>
+            </div>}
             <div className="detail-stat">
               <MapPin size={20} />
               <div>
@@ -215,7 +226,7 @@ export function StallDetail({
                 </small>
               </div>
             </div>
-            {!demo && (
+            {visitor && !demo && (
               <a
                 className="button primary full"
                 target="_blank"
@@ -225,14 +236,14 @@ export function StallDetail({
                 <ExternalLink size={16} /> Get directions
               </a>
             )}
-            {!stall.ownerId && (
+            {visitor && !stall.ownerId && (
               <div className="notice">
                 These opening hours haven’t been confirmed by the owner. A stall may close earlier
                 than listed.
               </div>
             )}
           </section>
-          <section className="panel">
+          {visitor && <section className="panel">
             <h3>Found the shutters down?</h3>
             <p style={{ margin: "12px 0 18px" }}>
               Let us know so we can check it for the next night owl.
@@ -272,7 +283,7 @@ export function StallDetail({
                 <Flag size={16} /> Report closed stall
               </button>
             )}
-          </section>
+          </section>}
         </aside>
       </div>
       {message && (

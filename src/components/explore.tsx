@@ -13,7 +13,8 @@ import {
   Search,
   AlertCircle,
 } from "lucide-react";
-import { type Coordinates, type Diet, type Stall, type Viewer } from "@/lib/config";
+import { DEFAULT_RADIUS_KM, type Coordinates, type Diet, type Stall, type Viewer } from "@/lib/config";
+import { useClock } from "@/hooks/use-clock";
 import { DEMO_LOCATION, DEMO_STALLS } from "@/lib/demo";
 import { distanceKm } from "@/lib/geo-time";
 import { StallCard } from "./stall-card";
@@ -23,7 +24,9 @@ import { useExploreTools } from "@/hooks/use-explore-tools";
 type Result = { stalls: Stall[]; hasMore: boolean };
 export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null }) {
   const location = useLocation();
-  const radius = useRadiusPreference();
+  const storedRadius = useRadiusPreference();
+  const radius = viewer ? storedRadius : DEFAULT_RADIUS_KM;
+  const now = useClock(demo);
   const [diet, setDiet] = useState<Diet | "all">("all"),
     [search, setSearch] = useState("");
   const [result, setResult] = useState<Result>({ stalls: [], hasMore: false }),
@@ -82,7 +85,7 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
     [radius, query, diet, sort],
   );
   useEffect(() => {
-    if (demo || !location.coordinates) return;
+    if (demo || !viewer || !location.coordinates) return;
     // Synchronize server results with an externally supplied GPS fix.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(location.coordinates);
@@ -91,7 +94,7 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
       clearInterval(timer);
       activeRequest.current?.abort();
     };
-  }, [demo, location.coordinates, load]);
+  }, [demo, viewer, location.coordinates, load]);
   const source = demo
     ? DEMO_STALLS.map((s) => ({ ...s, distance: distanceKm(DEMO_LOCATION, s) })).filter(
         (s) => s.distance <= radius,
@@ -170,7 +173,7 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
           <div>
             <div className="eyebrow">FOLLOW YOUR APPETITE</div>
             <h2>
-              Open around you <span className="count-pill">{permitted ? stalls.length : "—"}</span>
+              Stalls nearby <span className="count-pill">{permitted ? stalls.length : "—"}</span>
             </h2>
             <p>
               {permitted
@@ -178,10 +181,10 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
                 : "Your next food stop starts with your location."}
             </p>
           </div>
-          <Link href="/settings" className="button secondary small">
+          {viewer ? <Link href="/settings" className="button secondary small">
             <SlidersHorizontal size={16} />
             <span>Within {radius} km</span>
-          </Link>
+          </Link> : <button type="button" className="button secondary small" disabled title="Sign in to change distance"><SlidersHorizontal size={16} /><span>Within {radius} km · Sign in to change</span></button>}
         </div>
         <div className="filter-bar">
           <div className="diet-filters" role="group" aria-label="Food preference">
@@ -231,7 +234,7 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
           <div className="empty-state">
             <Compass size={36} />
             <h3>Your midnight food trail starts here</h3>
-            <p>Sign in to discover open stalls near your current location.</p>
+            <p>Sign in to discover stalls and their opening times near your current location.</p>
             <Link href="/login" className="button primary">
               Sign in to explore <ArrowRight size={16} />
             </Link>
@@ -243,7 +246,7 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
             <p>
               {location.error
                 ? "Allow location in your browser settings, then try again. Your location is needed to show nearby stalls."
-                : "HungryOwl uses your current location to find open stalls and calculate distances."}
+                : "HungryOwl uses your current location to find nearby stalls and calculate distances."}
             </p>
             <button
               className="button primary"
@@ -274,7 +277,7 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
           <>
             <div className="card-grid">
               {stalls.map((s, i) => (
-                <StallCard key={s.id} stall={s} index={i} />
+                <StallCard key={s.id} stall={s} index={i} now={now} />
               ))}
             </div>
             {result.hasMore && !demo && (
@@ -290,12 +293,11 @@ export function Explore({ demo, viewer }: { demo: boolean; viewer: Viewer | null
         ) : (
           <div className="empty-state">
             <Moon size={36} />
-            <h3>No open stalls found</h3>
+            <h3>No nearby stalls found</h3>
             <p>
-              Try a wider distance in settings or clear your filters. Only approved stalls that are
-              open now appear here.
+              Try a wider distance in settings or clear your filters. Approved stalls appear here with their opening times.
             </p>
-            <Link href="/settings" className="button secondary">
+            <Link href={viewer ? "/settings" : "/login"} className="button secondary">
               Adjust nearby distance
             </Link>
           </div>

@@ -1042,6 +1042,9 @@ p {
   margin: 20px 0;
 }
 .photo-upload {
+  color: inherit;
+  font-family: inherit;
+  padding: 0;
   border: 1px dashed #5b634b;
   border-radius: 10px;
   min-height: 160px;
@@ -1060,15 +1063,6 @@ p {
 .photo-upload > svg {
   color: var(--accent);
 }
-.photo-upload input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-  z-index: 2;
-}
 .photo-upload img {
   width: 100%;
   height: 175px;
@@ -1081,6 +1075,45 @@ p {
   position: absolute;
   bottom: 0;
   z-index: 1;
+}
+.camera-dialog {
+  width: min(600px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  margin: auto;
+  padding: 20px;
+  color: var(--text);
+  background: #10130d;
+  border: 1px solid #5b634b;
+  border-radius: 14px;
+}
+.camera-dialog::backdrop {
+  background: #000c;
+}
+.camera-heading,
+.camera-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.camera-heading h2 {
+  margin: 0;
+}
+.camera-dialog > p {
+  margin: 12px 0;
+}
+.camera-preview {
+  display: block;
+  width: 100%;
+  max-height: 55dvh;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #000;
+}
+.camera-actions {
+  margin-top: 16px;
 }
 .menu-edit-row {
   display: grid;
@@ -1158,6 +1191,50 @@ p {
   height: 310px;
   margin-bottom: 27px;
 }
+.photo-carousel {
+  min-width: 0;
+  margin-bottom: 27px;
+}
+.carousel-track {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-radius: 14px;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-photo {
+  position: relative;
+  flex: 0 0 100%;
+  height: clamp(245px, 35vw, 430px);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  background: var(--panel);
+}
+.carousel-photo img { object-fit: contain; }
+.carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.carousel-controls .icon-button { min-width: 44px; min-height: 44px; }
+.carousel-dots { display: flex; }
+.carousel-dots button { display: grid; place-items: center; width: 32px; height: 44px; }
+.carousel-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.carousel-dots .active span { background: var(--accent); }
+.opening-time { color: var(--accent); font-size: 13px; line-height: 1.5; margin: 10px 0; }
+.closed-badge { background: #f3d99e; color: #3e2c0b; }
+.closed-badge > span { background: #806329; }
+.submission-details { margin: 20px 0 0; }
+.submission-details > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.submission-details dt { color: var(--muted); font-size: 12px; }
+.submission-details dd { margin: 5px 0 0; font-size: 14px; overflow-wrap: anywhere; }
 .detail-photo {
   position: relative;
   overflow: hidden;

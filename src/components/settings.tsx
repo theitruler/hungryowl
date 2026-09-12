@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, LogOut, ShieldCheck, LocateFixed, Check, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { MAX_RADIUS_KM, type Viewer } from "@/lib/config";
+import { DEFAULT_RADIUS_KM, MAX_RADIUS_KM, type Viewer } from "@/lib/config";
 import { useRadiusPreference, saveRadiusPreference } from "@/hooks/use-radius-preference";
 import { authClient } from "@/lib/auth-client";
 import { useLocation } from "@/hooks/use-location";
@@ -14,9 +14,10 @@ export function Settings({ viewer, demo }: { viewer: Viewer | null; demo: boolea
     [saved, setSaved] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const radius = draft ?? storedRadius;
+  const radius = viewer ? draft ?? storedRadius : DEFAULT_RADIUS_KM;
   const location = useLocation();
   function save() {
+    if (!viewer) return;
     try {
       saveRadiusPreference(radius);
       setSaved(true);
@@ -59,10 +60,12 @@ export function Settings({ viewer, demo }: { viewer: Viewer | null; demo: boolea
           id="radius"
           className="field-range"
           type="range"
+          disabled={!viewer}
           min={1}
           max={MAX_RADIUS_KM}
           value={radius}
           onChange={(e) => {
+            if (!viewer) return;
             setRadius(Number(e.target.value));
             setSaved(false);
           }}
@@ -72,7 +75,7 @@ export function Settings({ viewer, demo }: { viewer: Viewer | null; demo: boolea
           <span>30 km · Worth the ride</span>
         </div>
         <div className="form-actions" style={{ marginTop: 25 }}>
-          <button className="button primary" onClick={save}>
+          <button className="button primary" onClick={save} disabled={!viewer}>
             {saved ? (
               <>
                 <Check size={17} /> Preference saved
@@ -82,6 +85,7 @@ export function Settings({ viewer, demo }: { viewer: Viewer | null; demo: boolea
             )}
           </button>
         </div>
+        {!viewer && <p><Link href="/login" className="text-link">Sign in to change your nearby distance</Link></p>}
         {saved && (
           <p role="status" style={{ marginTop: 15 }}>
             Your nearby list will use {radius} km.{" "}

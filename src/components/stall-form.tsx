@@ -1,76 +1,23 @@
 "use client";
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   LocateFixed,
   MapPin,
-  Camera,
   Plus,
   Trash2,
   Store,
   CheckCircle2,
 } from "lucide-react";
-import { DIETS, DIET_LABELS, MAX_PHOTO_BYTES, type Diet, type Stall } from "@/lib/config";
+import { DIETS, DIET_LABELS, MAX_PHOTO_BYTES, type Diet, type StallDetails } from "@/lib/config";
 import { stallCreateSchema, stallUpdateSchema } from "@/lib/validation";
 import { useLocation } from "@/hooks/use-location";
 import { mutate, errorMessage } from "@/lib/client-api";
+import { CameraPhotoInput } from "@/components/camera-photo-input";
 type EditableMenu = { name: string; price: string; diet: Diet };
-function PhotoInput({
-  index,
-  file,
-  existing,
-  onChange,
-}: {
-  index: number;
-  file: File | null;
-  existing?: string;
-  onChange: (file: File) => void;
-}) {
-  const [preview, setPreview] = useState(existing || "");
-  useEffect(() => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    // A browser-owned blob URL must be created and revoked outside rendering.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-  return (
-    <label className="photo-upload">
-      {preview ? (
-        <>
-          <Image
-            src={preview}
-            alt={`Selected stall photo ${index + 1}`}
-            width={600}
-            height={400}
-            unoptimized
-          />
-          <span className="photo-caption">Change photo {index + 1}</span>
-        </>
-      ) : (
-        <>
-          <Camera size={25} />
-          <strong>{index === 0 ? "The stall & signboard" : "Another view of the stall"}</strong>
-          <span>JPG, PNG or WebP · Up to 4 MB</span>
-        </>
-      )}
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        aria-label={`Stall photo ${index + 1}`}
-        onChange={(e) => {
-          const selected = e.target.files?.[0];
-          if (selected) onChange(selected);
-        }}
-      />
-    </label>
-  );
-}
-export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
+export function StallForm({ stall, demo, backHref = "/owner" }: { stall?: StallDetails; demo: boolean; backHref?: "/owner" | "/admin" }) {
   const editing = !!stall,
     router = useRouter(),
     location = useLocation();
@@ -78,7 +25,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
     [description, setDescription] = useState(stall?.description || ""),
     [area, setArea] = useState(stall?.area || ""),
     [relationship, setRelationship] = useState<"mine" | "other">("other"),
-    [contactPhone, setContactPhone] = useState("");
+    [contactPhone, setContactPhone] = useState(stall?.submission?.contactPhone || "");
   const [diets, setDiets] = useState<Diet[]>(stall?.diets || ["veg"]),
     [opensAt, setOpensAt] = useState(stall?.opensAt || "23:00"),
     [closesAt, setClosesAt] = useState(stall?.closesAt || "06:00");
@@ -91,6 +38,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
   );
   const [changeLocation, setChangeLocation] = useState(false),
     [closure, setClosure] = useState("keep");
+  const [reopensAt, setReopensAt] = useState("");
   const [busy, setBusy] = useState(false),
     [stage, setStage] = useState(""),
     [error, setError] = useState(""),
@@ -124,7 +72,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
       return;
     }
     if (photoIds.some((id, i) => !id && !files[i])) {
-      setError("Please add both stall photos.");
+      setError("Please take both stall photos using the camera.");
       return;
     }
     const base = {
@@ -147,9 +95,15 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
           accuracy: coords.accuracy,
         }
       : {};
+    const customReopening = closure === "custom" ? new Date(`${reopensAt}:00+05:30`) : null;
+    if (closure === "custom" && (!reopensAt || !customReopening || Number.isNaN(customReopening.getTime()))) {
+      setError("Choose a reopening date and time in Bangalore time.");
+      return;
+    }
     const payload = editing
       ? {
           ...base,
+          contactPhone,
           closedUntil:
             closure === "keep"
               ? stall.closedUntil && new Date(stall.closedUntil).getTime() > Date.now()
@@ -157,6 +111,8 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
                 : null
               : closure === "open"
                 ? null
+                : closure === "custom"
+                  ? customReopening!.toISOString()
                 : new Date(Date.now() + Number(closure) * 3600000).toISOString(),
           ...(changeLocation ? { location: captured } : {}),
         }
@@ -213,7 +169,9 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
         <p>
           {editing
             ? "Your changes are now saved. Opening hours and temporary closures update the nearby list automatically."
-            : "Your stall has been submitted for admin review. Once approved, our team will contact the owner to verify and assign the listing."}
+            : relationship === "mine"
+              ? "Your stall has been submitted for admin review. You can already manage its menu, timings and details in My stalls."
+              : "The stall has been submitted for admin review. You can track it in My stalls until an owner is assigned; it then moves to their My stalls section."}
         </p>
         <Link href={editing ? `/stalls/${createdId}` : "/owner"} className="button primary">
           {editing ? "View your stall" : "View my submissions"}
@@ -222,9 +180,9 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
     );
   return (
     <div className="narrow-page">
-      <Link href={editing ? "/owner" : "/"} className="back-link">
+      <Link href={editing ? backHref : "/"} className="back-link">
         <ArrowLeft size={15} />
-        {editing ? "My stalls" : "Back to exploring"}
+        {editing ? backHref === "/admin" ? "Back to admin review" : "My stalls" : "Back to exploring"}
       </Link>
       <div className="page-heading">
         <div className="eyebrow">
@@ -234,7 +192,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
         <h1>{editing ? "Keep the night crew in the know." : "Put a little stall on the map."}</h1>
         <p>
           {editing
-            ? "Update your verified listing directly. No approval needed."
+            ? "Update the menu, opening hours, photos and temporary closures. Pending listings appear nearby after admin approval."
             : "Found a place that’s still cooking after hours? Help another hungry owl find it."}
         </p>
       </div>
@@ -272,7 +230,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
                     Someone else’s stall
                   </label>
                 </div>
-                <small>Owners are verified by a phone call from our admin team.</small>
+                <small>Choose “My stall” to manage it immediately. Our admin team reviews every new listing.</small>
               </div>
             )}
             <label className="field">
@@ -314,7 +272,6 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
                 ))}
               </div>
             </div>
-            {!editing && (
               <label className="field">
                 Owner’s contact number
                 <input
@@ -326,10 +283,9 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
                   placeholder="10-digit Indian mobile number"
                 />
                 <small>
-                  Only the admin team sees this number. We use it to call and verify the owner.
+                  This number is visible to you, the assigned owner and the admin team for verification.
                 </small>
               </label>
-            )}
           </section>
           <section className="panel">
             <h2>02 · The spot</h2>
@@ -432,21 +388,27 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
                   <option value="12">Closed for the next 12 hours</option>
                   <option value="24">Closed for the next 24 hours</option>
                   <option value="168">Closed for the next 7 days</option>
+                  <option value="custom">Choose reopening date & time</option>
                 </select>
                 <small>
                   After a temporary closure ends, your normal hours resume automatically.
                 </small>
               </label>
             )}
+            {editing && closure === "custom" && <label className="field">
+              Reopens on (Bangalore time)
+              <input type="datetime-local" required value={reopensAt} onChange={(e) => setReopensAt(e.target.value)} />
+              <small>Choose a time within 90 days. Your daily schedule applies after this closure ends.</small>
+            </label>}
           </section>
           <section className="panel">
             <h2>04 · Two photos, the full picture</h2>
             <p>
-              A clear view of the stall and a second angle. Avoid faces and private information.
+              Tap each box to take a fresh photo: the stall and a second angle. Avoid faces and private information.
             </p>
             <div className="photo-grid">
               {[0, 1].map((i) => (
-                <PhotoInput
+                <CameraPhotoInput
                   key={i}
                   index={i}
                   file={files[i]}
@@ -520,7 +482,7 @@ export function StallForm({ stall, demo }: { stall?: Stall; demo: boolean }) {
           <div className="form-actions">
             <p>
               {editing
-                ? "Your changes go live immediately."
+                ? stall.status === "approved" ? "Your changes go live immediately." : "Your changes are saved for admin review."
                 : "Every new listing is reviewed before it appears."}
             </p>
             <button className="button primary" disabled={demo || busy} type="submit">

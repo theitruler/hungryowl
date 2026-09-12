@@ -139,7 +139,10 @@ run("Neon development branch integration", () => {
     expect(original?.name).toContain("QA Night Dosa");
   });
   it("allows approval once, then verified owner assignment", async () => {
+    expect((await services.myStalls(viewer(ids.submitter))).some((s) => s.id === stallId)).toBe(true);
     await services.moderate(stallId, { action: "approve" }, viewer(ids.admin, "admin"));
+    expect((await services.myStalls(viewer(ids.submitter))).some((s) => s.id === stallId)).toBe(true);
+    expect((await services.getStall(stallId, viewer(ids.submitter)))?.ownerId).toBeNull();
     await expect(
       services.moderate(stallId, { action: "approve" }, viewer(ids.admin, "admin")),
     ).rejects.toMatchObject({ status: 409 });
@@ -156,6 +159,30 @@ run("Neon development branch integration", () => {
       viewer(ids.admin, "admin"),
     );
     expect((await services.getStall(stallId, viewer(ids.owner)))?.ownerId).toBe(ids.owner);
+    expect((await services.myStalls(viewer(ids.submitter))).some((s) => s.id === stallId)).toBe(false);
+    expect((await services.myStalls(viewer(ids.owner))).find((s) => s.id === stallId)?.canManage).toBe(true);
+    expect((await services.myStalls(viewer(ids.other))).some((s) => s.id === stallId)).toBe(false);
+  });
+  it("approves an own-stall submission without a separate owner assignment", async () => {
+    const ownPhotos = [randomUUID(), randomUUID()];
+    await getDb().insert(tables.photos).values(ownPhotos.map((id) => ({ id, uploadedBy: ids.submitter })));
+    const ownStall = await services.createStall({
+      name: `QA Own Stall ${ids.submitter}`,
+      description: "Own-stall approval fixture", area: "Koramangala",
+      latitude: 12.9352, longitude: 77.6245, diets: ["veg"],
+      opensAt: "23:00", closesAt: "06:00", menu: [],
+      relationship: "mine", contactPhone: "9876543210", photoIds: ownPhotos,
+      locationCapturedAt: Date.now(), accuracy: 10,
+    }, viewer(ids.submitter));
+    await services.moderate(ownStall.id, { action: "approve" }, viewer(ids.admin, "admin"));
+    expect(await services.getStall(ownStall.id, viewer(ids.submitter))).toMatchObject({
+      status: "approved", ownerId: ids.submitter, canManage: true,
+    });
+    expect((await services.myStalls(viewer(ids.submitter))).some((s) => s.id === ownStall.id)).toBe(true);
+    expect((await services.adminQueue()).listings.some((s) => s.id === ownStall.id)).toBe(false);
+    await expect(services.moderate(ownStall.id, {
+      action: "claim", email: `${ids.owner}@example.invalid`, callConfirmed: true,
+    }, viewer(ids.admin, "admin"))).rejects.toMatchObject({ status: 409 });
   });
   it("upserts one rating per user and prevents owner self-ratings", async () => {
     await services.setRating(stallId, 3, viewer(ids.other));
@@ -167,7 +194,7 @@ run("Neon development branch integration", () => {
       status: 403,
     });
   });
-  it("owner closure removes the stall from nearby results", async () => {
+  it("owner closure keeps the stall visible with its reopening time", async () => {
     expect(
       (
         await services.nearby({ latitude: 12.9352, longitude: 77.6245, radius: 5, offset: 0 })
@@ -187,11 +214,8 @@ run("Neon development branch integration", () => {
       },
       viewer(ids.owner),
     );
-    expect(
-      (
-        await services.nearby({ latitude: 12.9352, longitude: 77.6245, radius: 5, offset: 0 })
-      ).stalls.some((s) => s.id === stallId),
-    ).toBe(false);
+    const nearby = await services.nearby({ latitude: 12.9352, longitude: 77.6245, radius: 5, offset: 0 });
+    expect(nearby.stalls.find((s) => s.id === stallId)?.closedUntil).toBeTruthy();
   });
   it("deduplicates daily closure reports and allows admin resolution", async () => {
     await services.reportClosed(stallId, "Shutters closed", viewer(ids.other));

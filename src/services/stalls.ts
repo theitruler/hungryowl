@@ -1,17 +1,18 @@
 import "server-only";
-import { and, eq, inArray, sql, desc, isNull } from "drizzle-orm";
+import { and, or, eq, inArray, sql, desc, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db";
 import { stalls, photos, stallPhotos, ratings, reports, user, auditLog } from "@/db/schema";
 import { ApiError } from "@/lib/http";
-import { localMinutes, inBangalore } from "@/lib/geo-time";
+import { inBangalore } from "@/lib/geo-time";
+import { canManageStall, isStallOwner } from "@/lib/stall-access";
 import {
   nearbySchema,
   stallCreateSchema,
   stallUpdateSchema,
   moderationSchema,
 } from "@/lib/validation";
-import type { Stall, Viewer } from "@/lib/config";
+import type { Stall, StallDetails, Viewer } from "@/lib/config";
 type StallRow = typeof stalls.$inferSelect;
 type DbTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 async function serialize(rows: StallRow[]): Promise<Stall[]> {
@@ -63,8 +64,6 @@ export async function nearby(input: z.input<typeof nearbySchema>) {
   const { latitude, longitude, radius, offset, q, diet, sort } = nearbySchema.parse(input),
     db = getDb();
   const pattern = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-  const minute = localMinutes(new Date()),
-    localTime = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
   const query = await db.execute<{ id: string; distance: number }>(sql`
     with nearby_stalls as (
       select id, (select coalesce(avg(stars), -1) from ratings where ratings.stall_id = stalls.id) as rating, 6371 * acos(least(1.0, greatest(-1.0,
@@ -75,9 +74,6 @@ export async function nearby(input: z.input<typeof nearbySchema>) {
       and (${q} = '' or name ilike ${pattern} or area ilike ${pattern} or menu::text ilike ${pattern})
       and latitude between ${latitude - radius / 110} and ${latitude + radius / 110}
       and longitude between ${longitude - radius / (110 * Math.cos((latitude * Math.PI) / 180))} and ${longitude + radius / (110 * Math.cos((latitude * Math.PI) / 180))}
-      and (closed_until is null or closed_until <= now())
-      and (opens_at = closes_at or (opens_at < closes_at and opens_at <= ${localTime} and closes_at > ${localTime})
-        or (opens_at > closes_at and (opens_at <= ${localTime} or closes_at > ${localTime})))
     ) select * from nearby_stalls where distance <= ${radius} order by ${sort === "rating" ? sql`rating desc, distance, id` : sql`distance, id`} limit 25 offset ${offset}`);
   const chosen = query.rows.slice(0, 24);
   if (!chosen.length) return { stalls: [], hasMore: false };
@@ -97,7 +93,7 @@ export async function nearby(input: z.input<typeof nearbySchema>) {
     hasMore: query.rows.length > 24,
   };
 }
-export async function getStall(id: string, viewer: Viewer | null) {
+export async function getStall(id: string, viewer: Viewer | null): Promise<StallDetails | null> {
   if (!z.uuid().safeParse(id).success) return null;
   const [row] = await getDb().select().from(stalls).where(eq(stalls.id, id));
   if (
@@ -109,7 +105,18 @@ export async function getStall(id: string, viewer: Viewer | null) {
   )
     return null;
   const [stall] = await serialize([row]);
-  return stall;
+  const canManage = canManageStall(row, viewer);
+  return {
+    ...stall,
+    canManage,
+    ...(canManage || row.submittedBy === viewer?.id ? {
+      submission: {
+        relationship: row.relationship,
+        contactPhone: row.contactPhone,
+        rejectionReason: row.rejectionReason,
+      },
+    } : {}),
+  };
 }
 async function attachPhotos(
   tx: DbTransaction,
@@ -118,7 +125,8 @@ async function attachPhotos(
   uploaderId: string,
   replacing = false,
 ) {
-  const candidates = await tx.select().from(photos).where(inArray(photos.id, ids)).for("update");
+  const candidates = await tx.select({ id: photos.id, uploadedBy: photos.uploadedBy })
+    .from(photos).where(inArray(photos.id, ids)).for("update");
   if (candidates.length !== 2) throw new ApiError(400, "Upload two stall photos first.");
   const existing = await tx.select().from(stallPhotos).where(inArray(stallPhotos.photoId, ids));
   for (const photo of candidates) {
@@ -174,8 +182,8 @@ export async function updateStall(
   return getDb().transaction(async (tx) => {
     const [row] = await tx.select().from(stalls).where(eq(stalls.id, id)).for("update");
     if (!row) throw new ApiError(404, "Stall not found.");
-    if (row.ownerId !== viewer.id && viewer.role !== "admin")
-      throw new ApiError(403, "Only the verified owner can edit this stall.");
+    if (!canManageStall(row, viewer))
+      throw new ApiError(403, "Only the stall owner or an administrator can edit this stall.");
     const { photoIds, closedUntil, location, ...values } = input;
     await tx
       .update(stalls)
@@ -197,7 +205,7 @@ export async function setRating(id: string, stars: number, viewer: Viewer) {
     .from(stalls)
     .where(and(eq(stalls.id, id), eq(stalls.status, "approved")));
   if (!stall) throw new ApiError(404, "Stall not found.");
-  if (stall.ownerId === viewer.id) throw new ApiError(403, "You cannot rate your own stall.");
+  if (isStallOwner(stall, viewer)) throw new ApiError(403, "You cannot rate your own stall.");
   await getDb()
     .insert(ratings)
     .values({ stallId: id, userId: viewer.id, stars })
@@ -221,11 +229,17 @@ export async function myStalls(viewer: Viewer) {
   const rows = await getDb()
     .select()
     .from(stalls)
-    .where(sql`${stalls.ownerId} = ${viewer.id} or ${stalls.submittedBy} = ${viewer.id}`)
+    .where(
+      or(
+        eq(stalls.ownerId, viewer.id),
+        and(isNull(stalls.ownerId), eq(stalls.submittedBy, viewer.id)),
+      ),
+    )
     .orderBy(desc(stalls.createdAt));
   const serialized = await serialize(rows);
   return serialized.map((s) => ({
     ...s,
+    canManage: canManageStall(rows.find((r) => r.id === s.id)!, viewer),
     rejectionReason: rows.find((r) => r.id === s.id)!.rejectionReason,
   }));
 }
@@ -286,6 +300,7 @@ export async function moderate(
         .update(stalls)
         .set({
           status: "approved",
+          ownerId: stall.ownerId ?? (stall.relationship === "mine" ? stall.submittedBy : null),
           approvedAt: new Date(),
           updatedAt: new Date(),
           rejectionReason: null,

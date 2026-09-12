@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DIETS, MAX_RADIUS_KM } from "./config";
 import { inBangalore, servesLateNight } from "./geo-time";
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const contactPhone = z.string().trim().regex(/^(\+91)?[6-9]\d{9}$/, "Enter a valid Indian mobile number for owner verification.");
 export const coordinatesSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
@@ -43,10 +44,7 @@ export const stallCreateSchema = stallFieldsSchema
       ),
     accuracy: z.number().positive().max(200, "Move outdoors for a more accurate location."),
     relationship: z.enum(["mine", "other"]),
-    contactPhone: z
-      .string()
-      .trim()
-      .regex(/^(\+91)?[6-9]\d{9}$/, "Enter a valid Indian mobile number for owner verification."),
+    contactPhone,
     photoIds: z
       .array(z.uuid())
       .length(2)
@@ -56,6 +54,7 @@ export const stallCreateSchema = stallFieldsSchema
   .refine((v) => servesLateNight(v.opensAt, v.closesAt), "Hours must overlap 11 pm–6 am.");
 export const stallUpdateSchema = stallFieldsSchema
   .extend({
+    contactPhone: contactPhone.optional(),
     location: coordinatesSchema
       .extend({
         locationCapturedAt: z

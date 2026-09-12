@@ -32,3 +32,11 @@ export type Stall = {
   distance?: number;
 };
 export type Viewer = { id: string; name: string; email: string; role: "user" | "admin" };
+export type StallDetails = Stall & {
+  canManage?: boolean;
+  submission?: {
+    relationship: "mine" | "other";
+    contactPhone: string;
+    rejectionReason: string | null;
+  };
+};
